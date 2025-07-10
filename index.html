@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <title>PII Anonymizer MVP</title>
   <script src="https://cdn.jsdelivr.net/npm/@xenova/transformers@latest"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.2/mammoth.browser.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
   <style>
     body { font-family: sans-serif; max-width: 800px; margin: 20px auto; padding: 20px; }
@@ -15,7 +16,7 @@
 <body>
   <h1>🛡️ PII Anonymizer MVP</h1>
 
-  <input type="file" id="fileInput" accept=".txt" />
+  <input type="file" id="fileInput" accept=".txt,.docx" />
   <button onclick="handleFileUpload()">Upload File</button>
 
   <h3>Original Text:</h3>
@@ -30,6 +31,11 @@
   <h3>Upload ChatGPT Output (with tokens):</h3>
   <input type="file" id="reuploadFile" accept=".txt" />
   <button onclick="handleReupload()">Upload AI Output</button>
+
+  <h3>Upload Mapping JSON:</h3>
+  <input type="file" id="mappingUpload" accept=".json" />
+  <button onclick="handleMappingUpload()">Upload Mapping</button>
+
   <button onclick="reverseAnonymization()">Reverse Anonymization</button>
 
   <h3>Final Reversed Output:</h3>
@@ -41,11 +47,23 @@
     function handleFileUpload() {
       const file = document.getElementById('fileInput').files[0];
       if (!file) return;
+
       const reader = new FileReader();
-      reader.onload = function (e) {
-        document.getElementById('originalText').value = e.target.result;
-      };
-      reader.readAsText(file);
+
+      if (file.name.endsWith('.txt')) {
+        reader.onload = function (e) {
+          document.getElementById('originalText').value = e.target.result;
+        };
+        reader.readAsText(file);
+      } else if (file.name.endsWith('.docx')) {
+        reader.onload = function (e) {
+          mammoth.extractRawText({ arrayBuffer: e.target.result })
+            .then(function(result) {
+              document.getElementById('originalText').value = result.value;
+            });
+        };
+        reader.readAsArrayBuffer(file);
+      }
     }
 
     function anonymize() {
@@ -66,7 +84,7 @@
         return token;
       });
 
-      result = result.replace(/\b([A-Z][a-z]+ [A-Z][a-z]+)\b/g, (match) => {
+      result = result.replace(/\b([A-Z][a-z]+\s[A-Z][a-z]+)\b/g, (match) => {
         const token = `[[PERSON_${counter++}]]`;
         mapping[token] = match;
         return token;
@@ -78,6 +96,21 @@
     function downloadMapping() {
       const blob = new Blob([JSON.stringify(mapping, null, 2)], { type: 'application/json' });
       saveAs(blob, 'mapping.json');
+    }
+
+    function handleMappingUpload() {
+      const file = document.getElementById('mappingUpload').files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        try {
+          mapping = JSON.parse(e.target.result);
+          alert('Mapping uploaded successfully!');
+        } catch (err) {
+          alert('Invalid JSON file.');
+        }
+      };
+      reader.readAsText(file);
     }
 
     function handleReupload() {
