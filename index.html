@@ -43,6 +43,7 @@
 
   <script>
     let mapping = {};
+    let reverseMapping = {}; // For consistent token assignment
 
     function handleFileUpload() {
       const file = document.getElementById('fileInput').files[0];
@@ -66,28 +67,34 @@
       }
     }
 
+    function getOrCreateToken(match, label, counterObj) {
+      if (reverseMapping[match]) {
+        return reverseMapping[match];
+      } else {
+        const token = `[[${label}_${counterObj.count++}]]`;
+        mapping[token] = match;
+        reverseMapping[match] = token;
+        return token;
+      }
+    }
+
     function anonymize() {
       const text = document.getElementById('originalText').value;
       mapping = {};
-      let counter = 1;
+      reverseMapping = {};
+      let counterObj = { count: 1 };
 
       let result = text;
       result = result.replace(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g, (match) => {
-        const token = `[[EMAIL_${counter++}]]`;
-        mapping[token] = match;
-        return token;
+        return getOrCreateToken(match, "EMAIL", counterObj);
       });
 
       result = result.replace(/(\+65\s?\d{4}\s?\d{4})/g, (match) => {
-        const token = `[[PHONE_${counter++}]]`;
-        mapping[token] = match;
-        return token;
+        return getOrCreateToken(match, "PHONE", counterObj);
       });
 
       result = result.replace(/\b([A-Z][a-z]+\s[A-Z][a-z]+)\b/g, (match) => {
-        const token = `[[PERSON_${counter++}]]`;
-        mapping[token] = match;
-        return token;
+        return getOrCreateToken(match, "PERSON", counterObj);
       });
 
       document.getElementById('anonymizedText').value = result;
