@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>PII Anonymizer MVP</title>
+  <script src="https://cdn.jsdelivr.net/npm/@xenova/transformers@latest"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  <style>
+    body { font-family: sans-serif; max-width: 800px; margin: 20px auto; padding: 20px; }
+    textarea { width: 100%; height: 200px; margin-bottom: 10px; }
+    button { margin: 5px 0; }
+    pre { background: #f9f9f9; padding: 10px; white-space: pre-wrap; word-wrap: break-word; }
+  </style>
+</head>
+<body>
+  <h1>🛡️ PII Anonymizer MVP</h1>
+
+  <input type="file" id="fileInput" accept=".txt" />
+  <button onclick="handleFileUpload()">Upload File</button>
+
+  <h3>Original Text:</h3>
+  <textarea id="originalText"></textarea>
+
+  <button onclick="anonymize()">Anonymize</button>
+  <button onclick="downloadMapping()">Download Mapping</button>
+
+  <h3>Anonymized Text:</h3>
+  <textarea id="anonymizedText"></textarea>
+
+  <h3>Upload ChatGPT Output (with tokens):</h3>
+  <input type="file" id="reuploadFile" accept=".txt" />
+  <button onclick="handleReupload()">Upload AI Output</button>
+  <button onclick="reverseAnonymization()">Reverse Anonymization</button>
+
+  <h3>Final Reversed Output:</h3>
+  <textarea id="reversedText"></textarea>
+
+  <script>
+    let mapping = {};
+
+    function handleFileUpload() {
+      const file = document.getElementById('fileInput').files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        document.getElementById('originalText').value = e.target.result;
+      };
+      reader.readAsText(file);
+    }
+
+    function anonymize() {
+      const text = document.getElementById('originalText').value;
+      mapping = {};
+      let counter = 1;
+
+      let result = text;
+      result = result.replace(/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g, (match) => {
+        const token = `[[EMAIL_${counter++}]]`;
+        mapping[token] = match;
+        return token;
+      });
+
+      result = result.replace(/(\+65\s?\d{4}\s?\d{4})/g, (match) => {
+        const token = `[[PHONE_${counter++}]]`;
+        mapping[token] = match;
+        return token;
+      });
+
+      result = result.replace(/\b([A-Z][a-z]+ [A-Z][a-z]+)\b/g, (match) => {
+        const token = `[[PERSON_${counter++}]]`;
+        mapping[token] = match;
+        return token;
+      });
+
+      document.getElementById('anonymizedText').value = result;
+    }
+
+    function downloadMapping() {
+      const blob = new Blob([JSON.stringify(mapping, null, 2)], { type: 'application/json' });
+      saveAs(blob, 'mapping.json');
+    }
+
+    function handleReupload() {
+      const file = document.getElementById('reuploadFile').files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        document.getElementById('reversedText').value = e.target.result;
+      };
+      reader.readAsText(file);
+    }
+
+    function reverseAnonymization() {
+      let text = document.getElementById('reversedText').value;
+      Object.keys(mapping).forEach(token => {
+        const original = mapping[token];
+        text = text.replaceAll(token, original);
+      });
+      document.getElementById('reversedText').value = text;
+    }
+  </script>
+</body>
+</html>
